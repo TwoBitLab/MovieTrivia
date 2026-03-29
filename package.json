@@ -10,6 +10,7 @@
     "seed:tmdb": "npx tsx scripts/seed-tmdb.ts",
     "seed:quotes": "npx tsx scripts/seed-quotes.ts",
     "seed:wikidata": "npx tsx scripts/seed-wikidata.ts",
+    "seed:sample": "npx tsx scripts/seed-sample.ts",
     "seed:all": "npm run seed:tmdb && npm run seed:quotes && npm run seed:wikidata"
   },
   "dependencies": {
