@@ -1,17 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 export default function RegisterForm() {
-  const router = useRouter();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,6 +28,7 @@ export default function RegisterForm() {
       password,
       options: {
         data: { display_name: displayName.trim(), is_anonymous: false },
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
 
@@ -38,8 +38,28 @@ export default function RegisterForm() {
       return;
     }
 
-    router.push("/");
-    router.refresh();
+    setConfirmed(true);
+    setLoading(false);
+  }
+
+  if (confirmed) {
+    return (
+      <div className="w-full max-w-sm text-center space-y-4">
+        <div className="text-5xl">📧</div>
+        <h1 className="text-2xl font-bold">Check your email</h1>
+        <p className="text-gray-400 text-sm">
+          We sent a confirmation link to{" "}
+          <span className="text-white font-medium">{email}</span>. Click the
+          link in that email to activate your account, then sign in.
+        </p>
+        <Link
+          href="/login"
+          className="inline-block mt-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 px-6 py-2 font-semibold transition-colors"
+        >
+          Go to Sign In
+        </Link>
+      </div>
+    );
   }
 
   return (
