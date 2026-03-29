@@ -56,7 +56,11 @@ export async function POST(request: NextRequest) {
     .in("type", settings.question_types);
 
   if (qErr) {
-    return Response.json({ error: "Failed to fetch questions" }, { status: 500 });
+    console.error("[POST /api/rooms] fetch questions error:", qErr);
+    return Response.json(
+      { error: "Failed to fetch questions", detail: qErr.message },
+      { status: 500 }
+    );
   }
 
   if (!questions || questions.length < 5) {
@@ -87,21 +91,26 @@ export async function POST(request: NextRequest) {
     attempts++;
   }
 
-  const { data: room, error: roomErr } = await service.from("rooms").insert({
-    code,
-    host_id: user.id,
-    status: "waiting",
-    settings,
-    question_ids: shuffled,
-  }).select("code").single();
+  const { data: room, error: roomErr } = await service
+    .from("rooms")
+    .insert({
+      code,
+      host_id: user.id,
+      status: "waiting",
+      settings,
+      question_ids: shuffled,
+    })
+    .select("id, code")
+    .single();
 
   if (roomErr || !room) {
+    console.error("[POST /api/rooms] create room error:", roomErr);
     return Response.json({ error: "Failed to create room" }, { status: 500 });
   }
 
-  // Add host to room_players
+  // Add host to room_players — use the id returned from the insert above
   await service.from("room_players").insert({
-    room_id: (await service.from("rooms").select("id").eq("code", code).single()).data?.id!,
+    room_id: room.id,
     player_id: user.id,
     is_host: true,
   });
