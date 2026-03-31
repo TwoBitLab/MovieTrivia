@@ -63,6 +63,15 @@ async function seedBestPictureWinners() {
   const allTitles = results.map((r) => r.filmLabel.value);
 
   let inserted = 0;
+  let errors = 0;
+
+  async function upsert(row: Record<string, unknown>) {
+    const { error } = await supabase
+      .from("questions")
+      .upsert(row, { onConflict: "source,prompt,correct_answer", ignoreDuplicates: true });
+    if (error) { console.error("  Upsert failed:", error.message); errors++; }
+    else { inserted++; }
+  }
 
   for (const r of results) {
     const title = r.filmLabel.value;
@@ -75,7 +84,7 @@ async function seedBestPictureWinners() {
       .slice(0, 3);
 
     // Q1: Did X win Best Picture?
-    await supabase.from("questions").upsert({
+    await upsert({
       type: "trivia",
       difficulty: 2,
       genres: ["Drama"],
@@ -86,11 +95,11 @@ async function seedBestPictureWinners() {
       wrong_answers: ["No", "It was nominated but didn't win", "It was not eligible"],
       source: "wikidata",
       tmdb_movie_id: null,
-    }, { onConflict: "source,prompt", ignoreDuplicates: true });
+    });
 
     // Q2: Which of these films won Best Picture?
     if (wrongs.length === 3) {
-      await supabase.from("questions").upsert({
+      await upsert({
         type: "trivia",
         difficulty: 3,
         genres: ["Drama"],
@@ -101,14 +110,14 @@ async function seedBestPictureWinners() {
         wrong_answers: wrongs,
         source: "wikidata",
         tmdb_movie_id: null,
-      }, { onConflict: "source,prompt", ignoreDuplicates: true });
+      });
     }
 
-    inserted += 2;
     if (inserted % 50 === 0) console.log(`  ${inserted} wikidata questions…`);
     await sleep(100);
   }
 
+  if (errors > 0) console.error(`  Best Picture: ${errors} upsert errors`);
   return inserted;
 }
 
@@ -142,7 +151,7 @@ async function seedSequelTrivia() {
 
     if (distractors.length < 3) continue;
 
-    await supabase.from("questions").upsert({
+    const { error } = await supabase.from("questions").upsert({
       type: "trivia",
       difficulty: 2,
       genres: ["Action", "Drama"],
@@ -153,9 +162,10 @@ async function seedSequelTrivia() {
       wrong_answers: distractors,
       source: "wikidata",
       tmdb_movie_id: null,
-    }, { onConflict: "source,prompt", ignoreDuplicates: true });
+    }, { onConflict: "source,prompt,correct_answer", ignoreDuplicates: true });
 
-    inserted++;
+    if (error) { console.error("  Upsert failed:", error.message); }
+    else { inserted++; }
     await sleep(50);
   }
 

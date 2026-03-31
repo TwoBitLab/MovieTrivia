@@ -133,6 +133,19 @@ async function run() {
   const movieTitles = movieList.map((m) => m.title);
 
   let inserted = 0;
+  let errors = 0;
+
+  async function upsertQuestion(row: Record<string, unknown>) {
+    const { error } = await supabase
+      .from("questions")
+      .upsert(row, { onConflict: "source,prompt,correct_answer", ignoreDuplicates: true });
+    if (error) {
+      console.error("  Upsert failed:", error.message, JSON.stringify(row).slice(0, 120));
+      errors++;
+    } else {
+      inserted++;
+    }
+  }
 
   for (const movie of movieList) {
     const credits = await fetchCredits(movie.id);
@@ -147,7 +160,7 @@ async function run() {
         .sort(() => Math.random() - 0.5)
         .slice(0, 3);
 
-      await supabase.from("questions").upsert({
+      await upsertQuestion({
         type: "image_id",
         difficulty: 2,
         genres: movie.genres,
@@ -158,8 +171,7 @@ async function run() {
         wrong_answers: wrongs,
         source: "tmdb",
         tmdb_movie_id: movie.id,
-      }, { onConflict: "tmdb_movie_id,type,prompt", ignoreDuplicates: true });
-      inserted++;
+      });
     }
 
     // 2. Director identification
@@ -171,7 +183,7 @@ async function run() {
       const wrongDirs = [...new Set(directorPool)].sort(() => Math.random() - 0.5).slice(0, 3) as string[];
 
       if (wrongDirs.length === 3) {
-        await supabase.from("questions").upsert({
+        await upsertQuestion({
           type: "director",
           difficulty: 2,
           genres: movie.genres,
@@ -182,8 +194,7 @@ async function run() {
           wrong_answers: wrongDirs,
           source: "tmdb",
           tmdb_movie_id: movie.id,
-        }, { onConflict: "tmdb_movie_id,type,prompt", ignoreDuplicates: true });
-        inserted++;
+        });
       }
     }
 
@@ -192,7 +203,7 @@ async function run() {
       const actor = topCast[0];
       const wrongChars = topCast.slice(1, 4).map((c) => c.character);
       if (wrongChars.length >= 1) {
-        await supabase.from("questions").upsert({
+        await upsertQuestion({
           type: "actor_match",
           difficulty: 2,
           genres: movie.genres,
@@ -214,15 +225,14 @@ async function run() {
           },
           source: "tmdb",
           tmdb_movie_id: movie.id,
-        }, { onConflict: "tmdb_movie_id,type,prompt", ignoreDuplicates: true });
-        inserted++;
+        });
       }
     }
 
     // 4. Decade guess
     {
       const options = decadeOptions(movie.decade);
-      await supabase.from("questions").upsert({
+      await upsertQuestion({
         type: "decade",
         difficulty: 1,
         genres: movie.genres,
@@ -233,15 +243,14 @@ async function run() {
         wrong_answers: options.filter((o) => o !== `${movie.decade}s`),
         source: "tmdb",
         tmdb_movie_id: movie.id,
-      }, { onConflict: "tmdb_movie_id,type,prompt", ignoreDuplicates: true });
-      inserted++;
+      });
     }
 
     // 5. Box office trivia
     if (movie.revenue > 0) {
       const threshold = 100_000_000;
       const correct = movie.revenue >= threshold ? "Yes" : "No";
-      await supabase.from("questions").upsert({
+      await upsertQuestion({
         type: "box_office",
         difficulty: 2,
         genres: movie.genres,
@@ -252,14 +261,19 @@ async function run() {
         wrong_answers: [correct === "Yes" ? "No" : "Yes", "Unknown", "Not released theatrically"],
         source: "tmdb",
         tmdb_movie_id: movie.id,
-      }, { onConflict: "tmdb_movie_id,type,prompt", ignoreDuplicates: true });
-      inserted++;
+      });
     }
 
-    if (inserted % 100 === 0) console.log(`  ${inserted} questions inserted so far…`);
+    if ((inserted + errors) % 100 === 0) {
+      console.log(`  ${inserted} inserted, ${errors} errors so far…`);
+    }
   }
 
-  console.log(`Done. Total questions inserted/updated: ${inserted}`);
+  if (errors > 0) {
+    console.error(`Done with errors. Inserted: ${inserted}, Failed: ${errors}`);
+    process.exit(1);
+  }
+  console.log(`Done. Total questions inserted: ${inserted}`);
 }
 
 run().catch((err) => { console.error(err); process.exit(1); });
