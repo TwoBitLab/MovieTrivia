@@ -28,8 +28,12 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
 const CSV_PATH = path.join(import.meta.dirname ?? __dirname, "data", "movie_quotes.csv");
 
 if (!fs.existsSync(CSV_PATH)) {
-  console.error(`CSV not found at ${CSV_PATH}. Download from Kaggle and place it there.`);
-  process.exit(1);
+  console.warn(`⚠️  CSV not found at ${CSV_PATH}.`);
+  console.warn("   Skipping quote seeding. To include quotes:");
+  console.warn("   1. Download from https://www.kaggle.com/datasets/preprocessiing/movie-quotes-dataset");
+  console.warn("   2. Save as scripts/data/movie_quotes.csv");
+  console.warn("   3. Re-run: npm run seed:quotes");
+  process.exit(0);
 }
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
