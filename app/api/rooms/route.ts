@@ -64,8 +64,13 @@ export async function POST(request: NextRequest) {
   }
 
   if (!questions || questions.length < 5) {
+    const isEmpty = !questions || questions.length === 0;
     return Response.json(
-      { error: "Not enough questions for these filters. Try broader settings." },
+      {
+        error: isEmpty
+          ? "The question bank is empty. Run `npm run seed:sample` (quick test) or `npm run seed:all` (full library) to populate it."
+          : "Not enough questions match these filters. Try selecting more genres, a wider decade range, or more question types.",
+      },
       { status: 422 }
     );
   }
